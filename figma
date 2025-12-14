@@ -1,0 +1,132 @@
+import { useState, useEffect } from 'react';
+import { LoginScreen } from './components/LoginScreen';
+import { Dashboard } from './components/Dashboard';
+import { AddExpense } from './components/AddExpense';
+import { ExpenseList } from './components/ExpenseList';
+import { CategorySummary } from './components/CategorySummary';
+import { Navigation } from './components/Navigation';
+
+export interface Expense {
+  id: string;
+  amount: number;
+  category: string;
+  date: string;
+  notes: string;
+}
+
+export interface User {
+  email: string;
+  name: string;
+}
+
+type Screen = 'login' | 'dashboard' | 'add' | 'list' | 'summary';
+
+export default function App() {
+  const [currentScreen, setCurrentScreen] = useState<Screen>('login');
+  const [user, setUser] = useState<User | null>(null);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+
+  // Load data from localStorage on mount
+  useEffect(() => {
+    const savedUser = localStorage.getItem('expenseTrackerUser');
+    const savedExpenses = localStorage.getItem('expenseTrackerExpenses');
+    
+    if (savedUser) {
+      setUser(JSON.parse(savedUser));
+      setCurrentScreen('dashboard');
+    }
+    
+    if (savedExpenses) {
+      setExpenses(JSON.parse(savedExpenses));
+    }
+  }, []);
+
+  // Save expenses to localStorage whenever they change
+  useEffect(() => {
+    if (expenses.length > 0) {
+      localStorage.setItem('expenseTrackerExpenses', JSON.stringify(expenses));
+    }
+  }, [expenses]);
+
+  const handleLogin = (email: string, name: string) => {
+    const newUser = { email, name };
+    setUser(newUser);
+    localStorage.setItem('expenseTrackerUser', JSON.stringify(newUser));
+    setCurrentScreen('dashboard');
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    localStorage.removeItem('expenseTrackerUser');
+    setCurrentScreen('login');
+  };
+
+  const handleAddExpense = (expense: Omit<Expense, 'id'>) => {
+    const newExpense = {
+      ...expense,
+      id: Date.now().toString(),
+    };
+    setExpenses([...expenses, newExpense]);
+    setCurrentScreen('dashboard');
+  };
+
+  const handleUpdateExpense = (expense: Expense) => {
+    setExpenses(expenses.map(e => e.id === expense.id ? expense : e));
+    setEditingExpense(null);
+    setCurrentScreen('list');
+  };
+
+  const handleDeleteExpense = (id: string) => {
+    setExpenses(expenses.filter(e => e.id !== id));
+  };
+
+  const handleEditExpense = (expense: Expense) => {
+    setEditingExpense(expense);
+    setCurrentScreen('add');
+  };
+
+  const handleCancelEdit = () => {
+    setEditingExpense(null);
+    setCurrentScreen('list');
+  };
+
+  if (!user) {
+    return <LoginScreen onLogin={handleLogin} />;
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <Navigation 
+        currentScreen={currentScreen} 
+        onNavigate={setCurrentScreen}
+        user={user}
+        onLogout={handleLogout}
+      />
+      
+      <main className="max-w-6xl mx-auto px-4 py-6">
+        {currentScreen === 'dashboard' && (
+          <Dashboard expenses={expenses} onNavigate={setCurrentScreen} />
+        )}
+        {currentScreen === 'add' && (
+          <AddExpense 
+            onAddExpense={handleAddExpense}
+            onUpdateExpense={handleUpdateExpense}
+            editingExpense={editingExpense}
+            onCancel={handleCancelEdit}
+          />
+        )}
+        {currentScreen === 'list' && (
+          <ExpenseList 
+            expenses={expenses}
+            onEdit={handleEditExpense}
+            onDelete={handleDeleteExpense}
+          />
+        )}
+        {currentScreen === 'summary' && (
+          <CategorySummary expenses={expenses} />
+        )}
+      </main>
+    </div>
+  );
+}
